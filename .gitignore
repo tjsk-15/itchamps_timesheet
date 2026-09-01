@@ -22,3 +22,5 @@ build/
 ._.editorconfig
 ._.git
 ._.github
+._*
+__MACOSX/

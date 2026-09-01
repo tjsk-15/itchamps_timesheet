@@ -13,6 +13,7 @@ Rules enforced:
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Coalesce, Sum
 from frappe.utils import add_to_date, flt, get_datetime, getdate
 
 MAX_DAILY_HOURS = 12.0
@@ -280,42 +281,38 @@ def validate_daily_limit(doc):
 
 def hours_booked_elsewhere(doc, days):
 	"""Hours already submitted by this employee on the given days, excluding
-	this document and excluding rejected or cancelled timesheets."""
+	this document and excluding rejected or cancelled timesheets.
+
+	Built with frappe.qb rather than frappe.get_all. Querying a child doctype
+	through get_all needed a `parent` hint on v15 and that argument was dropped
+	when v16 moved to qb_query, so the query builder is the portable option. It
+	also does the join and the per day sum in one round trip.
+	"""
 	if not doc.employee or not days:
 		return {}
 
-	rows = frappe.get_all(
-		"Timesheet Detail",
-		parent="Timesheet",
-		filters={
-			"parenttype": "Timesheet",
-			"docstatus": 1,
-			"custom_from_date": ("in", days),
-		},
-		fields=["parent", "custom_from_date", "hours"],
-		ignore_permissions=True,
-	)
+	detail = frappe.qb.DocType("Timesheet Detail")
+	sheet = frappe.qb.DocType("Timesheet")
 
-	candidates = {row.parent for row in rows if row.parent != doc.name}
-	if not candidates:
-		return {}
-
-	live = {
-		ts.name
-		for ts in frappe.get_all(
-			"Timesheet",
-			filters={"name": ("in", list(candidates)), "employee": doc.employee},
-			fields=["name", "workflow_state"],
-			ignore_permissions=True,
-		)
-		if (ts.workflow_state or "") not in DEAD_STATES
-	}
+	rows = (
+		frappe.qb.from_(detail)
+		.join(sheet)
+		.on(detail.parent == sheet.name)
+		.select(detail.custom_from_date, Sum(detail.hours).as_("hours"))
+		.where(detail.parenttype == "Timesheet")
+		.where(detail.custom_from_date.isin(days))
+		.where(sheet.employee == doc.employee)
+		.where(sheet.docstatus == 1)
+		.where(sheet.name != (doc.name or ""))
+		# Coalesce matters: NOT IN against a NULL workflow_state yields NULL and
+		# would silently drop timesheets that predate the workflow.
+		.where(Coalesce(sheet.workflow_state, "").notin(list(DEAD_STATES)))
+		.groupby(detail.custom_from_date)
+	).run(as_dict=True)
 
 	booked = {}
 	for row in rows:
-		if row.parent in live:
-			day = getdate(row.custom_from_date)
-			booked[day] = booked.get(day, 0.0) + flt(row.hours)
+		booked[getdate(row.custom_from_date)] = flt(row.hours)
 	return booked
 
 

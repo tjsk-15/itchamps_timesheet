@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ruff
+        run: pip install ruff==0.6.9
+
+      - name: Ruff check
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+  tests:
+    name: Server tests
+    runs-on: ubuntu-latest
+    # Bench CI needs MariaDB and Redis services and a full frappe install. It is
+    # left disabled until a runner is available, because a red build nobody can
+    # fix is worse than no build. Locally:
+    #   bench --site <site> run-tests --app itchamps_timesheet
+    if: false
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "see docs/DECISION.md for the manual test cycle"

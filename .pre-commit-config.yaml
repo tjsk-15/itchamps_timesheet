@@ -1,0 +1,21 @@
+exclude: 'node_modules|.git|docs/'
+default_stages: [pre-commit]
+fail_fast: false
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        files: "itchamps_timesheet.*"
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: check-ast
+      - id: end-of-file-fixer
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format

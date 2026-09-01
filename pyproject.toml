@@ -1,0 +1,37 @@
+[project]
+name = "itchamps_timesheet"
+authors = [
+    { name = "ITChamps Software Private Limited", email = "support@itchamps.com" },
+]
+description = "Timesheet guardrails for Frappe HRMS: daily hour caps, one day per row, approver lockdown"
+requires-python = ">=3.10"
+readme = "README.md"
+dynamic = ["version"]
+dependencies = []
+
+[build-system]
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.bench.frappe-dependencies]
+frappe = ">=15.0.0,<17.0.0"
+erpnext = ">=15.0.0,<17.0.0"
+hrms = ">=15.0.0,<17.0.0"
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "I", "UP", "B", "RUF"]
+ignore = [
+    "B017",   # assertRaises(Exception)
+    "E101",   # indentation contains mixed spaces and tabs
+    "W191",   # indentation contains tabs
+    "RUF001", # ambiguous unicode
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "tab"

@@ -11,3 +11,14 @@ build/
 .idea/
 .vscode/
 .ruff_cache/
+._pyproject.toml
+._README.md
+._license.txt
+._LICENSE
+._itchamps_timesheet
+._docs
+._.pre-commit-config.yaml
+._.gitignore
+._.editorconfig
+._.git
+._.github

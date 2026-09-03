@@ -43,11 +43,18 @@ def before_validate(doc, method=None):
 	block_amendment(doc)
 	guard_locked_document(doc)
 	guard_approver_edits(doc)
+
+	if is_entering_dead_state(doc):
+		return
+
 	normalise_rows(doc)
 
 
 def validate(doc, method=None):
 	"""Runs after the ERPNext Timesheet controller has done its own validate."""
+	if is_entering_dead_state(doc):
+		return
+
 	validate_single_project(doc)
 	booked = validate_daily_limit(doc)
 	assign_times(doc, booked)
@@ -151,6 +158,25 @@ def is_timesheet_owner(doc):
 	if not doc.employee:
 		return False
 	return frappe.db.get_value("Employee", doc.employee, "user_id") == frappe.session.user
+
+
+def is_entering_dead_state(doc):
+	"""True when this save is a rejection or a cancellation.
+
+	Content rules are skipped for these transitions. A timesheet that already
+	breaks a rule, whether it is legacy data or a second submission that pushed a
+	day over the cap, must still be rejectable. Otherwise the only action that
+	clears the bad data is the one the rules block and the approver is stuck.
+	"""
+	before = doc.get_doc_before_save()
+	if not before:
+		# A brand new document cannot be moved into a dead state. Without this
+		# guard, inserting a document already set to Rejected would skip every rule.
+		return False
+
+	new_state = doc.get("workflow_state") or ""
+	old_state = before.workflow_state or ""
+	return new_state in DEAD_STATES and new_state != old_state
 
 
 def row_signature(doc):
@@ -264,7 +290,8 @@ def validate_daily_limit(doc):
 				_(
 					"{0} already has {1} hours submitted on {2}. This timesheet "
 					"adds {3} more, taking the day to {4} hours against a limit "
-					"of {5}. Please reduce the hours for that day."
+					"of {5}. Reduce the hours for that day, or reject this "
+					"timesheet so a corrected one can be raised."
 				).format(
 					doc.employee_name or doc.employee,
 					already,

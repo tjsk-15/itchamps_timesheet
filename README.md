@@ -67,6 +67,36 @@ Item 5 in the previous version of this list, the search index on
 `Timesheet Detail.custom_from_date`, is now handled by
 `patches/v0_1/add_timesheet_detail_index.py` and runs on install and migrate.
 
+## Turning rules off
+
+Every rule can be switched off from **Timesheet Guardrail Settings** (a Single,
+System Manager only, with change tracking on). No redeploy.
+
+Three ways to relax enforcement, in order of preference:
+
+1. **Enforce from date.** Rules apply only to timesheets with at least one row
+   on or after this date. This is the right tool for backlog entry: it is
+   targeted, permanent, and cannot be left switched off by accident. A timesheet
+   that straddles the date is still validated.
+2. **Individual rule checkboxes.** Turn off just the daily limit, or just the
+   one row per day rule, and leave the rest enforced. `Maximum hours per
+   employee per day` is also editable here, so raising the cap to 16 for a
+   period is an alternative to switching it off.
+3. **Bypass until.** Switches off every rule, for every employee, until the
+   datetime you set, then expires on its own. Capped at 24 hours ahead and a
+   reason is mandatory. Clear the field to end it early.
+
+Two things to be clear about before using the bypass. It applies to everyone,
+not just the person with the backlog, so anything can be submitted during the
+window. And re-enabling does not clean up: the rules only run on save, so
+whatever was entered during the bypass stays until someone edits it. That is
+why the bypass expires on its own and why `Enforce from date` is the better
+answer whenever it fits.
+
+An unset checkbox counts as on. A missing settings record cannot mean
+unenforced, so a fresh install before `bench migrate` still enforces
+everything.
+
 ## Layout
 
 ```

@@ -16,8 +16,10 @@ from frappe import _
 from frappe.query_builder.functions import Coalesce, Sum
 from frappe.utils import add_to_date, flt, get_datetime, getdate
 
+from itchamps_timesheet.overrides.guardrails import guardrails
+
+# Fallback only. The live value comes from Timesheet Guardrail Settings.
 MAX_DAILY_HOURS = 12.0
-MAX_ROW_HOURS = 12.0
 DAY_START = "09:00:00"
 
 #: Terminal workflow states. Nothing is editable once one of these is reached.
@@ -29,8 +31,9 @@ DEAD_STATES = ("Rejected", "Cancelled")
 #: Roles allowed to bypass the guardrails for data fixes.
 PRIVILEGED_ROLES = ("System Manager",)
 
-#: Set to False if one timesheet is allowed to span several projects.
-ENFORCE_SINGLE_PROJECT = True
+# Every rule below can be switched off, and MAX_DAILY_HOURS overridden, from
+# Timesheet Guardrail Settings. These stay as the fallback when that record has
+# never been saved.
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +114,9 @@ def is_privileged(user=None):
 
 
 def block_amendment(doc):
+	if not guardrails(doc).block_amendment:
+		return
+
 	if doc.amended_from and not is_privileged():
 		frappe.throw(
 			_(
@@ -122,6 +128,9 @@ def block_amendment(doc):
 
 
 def guard_locked_document(doc):
+	if not guardrails(doc).lock_terminal_states:
+		return
+
 	before = doc.get_doc_before_save()
 	if not before or is_privileged():
 		return
@@ -138,6 +147,9 @@ def guard_locked_document(doc):
 
 
 def guard_approver_edits(doc):
+	if not guardrails(doc).approver_lockdown:
+		return
+
 	before = doc.get_doc_before_save()
 	if not before or is_privileged() or is_timesheet_owner(doc):
 		return
@@ -202,6 +214,8 @@ def row_signature(doc):
 
 
 def normalise_rows(doc):
+	rules = guardrails(doc)
+
 	if not doc.time_logs:
 		frappe.throw(_("Please add at least one time log entry."))
 
@@ -215,23 +229,23 @@ def normalise_rows(doc):
 		from_day = getdate(row.custom_from_date)
 		to_day = getdate(row.custom_to_date)
 
-		if from_day != to_day:
+		if rules.single_day_rows and from_day != to_day:
 			frappe.throw(
 				_(
 					"Row {0} runs from {1} to {2}. Each timesheet line must cover a "
 					"single day. Please split it into one row per day so the {3} "
 					"hour daily limit can be applied."
-				).format(row.idx, from_day, to_day, MAX_DAILY_HOURS),
+				).format(row.idx, from_day, to_day, rules.max_daily_hours),
 				title=_("One row, one day"),
 			)
 
 		hours = flt(row.hours, 2)
 		if hours <= 0:
 			frappe.throw(_("Row {0}: hours must be greater than zero.").format(row.idx))
-		if hours > MAX_ROW_HOURS:
+		if hours > rules.max_daily_hours:
 			frappe.throw(
 				_("Row {0} has {1} hours. A single entry cannot exceed {2} hours.").format(
-					row.idx, hours, MAX_ROW_HOURS
+					row.idx, hours, rules.max_daily_hours
 				)
 			)
 
@@ -242,7 +256,7 @@ def validate_single_project(doc):
 		if row.project and row.project not in projects:
 			projects.append(row.project)
 
-	if ENFORCE_SINGLE_PROJECT and len(projects) > 1:
+	if guardrails(doc).single_project and len(projects) > 1:
 		frappe.throw(
 			_(
 				"A timesheet can only cover one project. Please raise a separate "
@@ -261,7 +275,7 @@ def validate_single_project(doc):
 
 
 def validate_daily_limit(doc):
-	"""Reject the document if any day would go over MAX_DAILY_HOURS once this
+	"""Reject the document if any day would go over the configured cap once this
 	timesheet is counted alongside the employee's other submitted timesheets.
 
 	Returns the hours already booked per day, which assign_times reuses.
@@ -274,6 +288,8 @@ def validate_daily_limit(doc):
 	if not own:
 		return {}
 
+	rules = guardrails(doc)
+
 	if doc.docstatus == 1 and doc.employee:
 		# Serialise concurrent submissions for the same employee so two
 		# timesheets cannot both pass the check and then both commit.
@@ -281,11 +297,15 @@ def validate_daily_limit(doc):
 
 	booked = hours_booked_elsewhere(doc, list(own))
 
+	if not rules.daily_limit:
+		# assign_times still needs the booked hours so rows do not overlap.
+		return booked
+
 	for day in sorted(own):
 		already = flt(booked.get(day), 2)
 		adding = flt(own[day], 2)
 		total = flt(already + adding, 2)
-		if total > MAX_DAILY_HOURS:
+		if total > rules.max_daily_hours:
 			frappe.throw(
 				_(
 					"{0} already has {1} hours submitted on {2}. This timesheet "
@@ -298,7 +318,7 @@ def validate_daily_limit(doc):
 					day,
 					adding,
 					total,
-					MAX_DAILY_HOURS,
+					rules.max_daily_hours,
 				),
 				title=_("Daily limit exceeded"),
 			)

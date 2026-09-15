@@ -1,0 +1,48 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-09-15 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "enforcement_section", "enforce_daily_limit", "max_daily_hours",
+  "enforce_single_day_rows", "enforce_single_project", "enforcement_col",
+  "enforce_approver_lockdown", "lock_terminal_states", "block_amendment",
+  "scope_section", "enforce_from_date",
+  "bypass_section", "bypass_help", "bypass_until", "bypass_reason"
+ ],
+ "fields": [
+  {"fieldname": "enforcement_section", "fieldtype": "Section Break", "label": "Rules"},
+  {"default": "1", "fieldname": "enforce_daily_limit", "fieldtype": "Check", "label": "Enforce daily hour limit"},
+  {"default": "12", "depends_on": "enforce_daily_limit", "fieldname": "max_daily_hours", "fieldtype": "Float", "label": "Maximum hours per employee per day", "precision": "2"},
+  {"default": "1", "description": "A timesheet row must start and end on the same date.", "fieldname": "enforce_single_day_rows", "fieldtype": "Check", "label": "Enforce one row per day"},
+  {"default": "1", "fieldname": "enforce_single_project", "fieldtype": "Check", "label": "Enforce one project per timesheet"},
+  {"fieldname": "enforcement_col", "fieldtype": "Column Break"},
+  {"default": "1", "description": "Approvers can move the workflow but cannot change hours, dates or projects.", "fieldname": "enforce_approver_lockdown", "fieldtype": "Check", "label": "Enforce approver lockdown"},
+  {"default": "1", "description": "Approved and Rejected timesheets cannot be edited.", "fieldname": "lock_terminal_states", "fieldtype": "Check", "label": "Lock approved and rejected timesheets"},
+  {"default": "1", "fieldname": "block_amendment", "fieldtype": "Check", "label": "Block amendment"},
+  {"fieldname": "scope_section", "fieldtype": "Section Break", "label": "Scope"},
+  {"description": "Rules apply only to timesheets with at least one row on or after this date. Leave blank to apply them everywhere. Prefer this over a bypass for backlog entry: it is targeted, permanent, and cannot be left switched off by accident.", "fieldname": "enforce_from_date", "fieldtype": "Date", "label": "Enforce from date"},
+  {"fieldname": "bypass_section", "fieldtype": "Section Break", "label": "Temporary bypass"},
+  {"fieldname": "bypass_help", "fieldtype": "HTML", "options": "<p class=\"text-muted small\">A bypass switches off every rule above, for every employee, until the time you set. It then expires on its own. It does not clean up anything entered during the window.</p>"},
+  {"description": "Maximum 24 hours ahead. Clear the field to end the bypass immediately.", "fieldname": "bypass_until", "fieldtype": "Datetime", "label": "Bypass until"},
+  {"fieldname": "bypass_reason", "fieldtype": "Small Text", "label": "Bypass reason", "mandatory_depends_on": "bypass_until"}
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ITChamps Timesheet",
+ "name": "Timesheet Guardrail Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "email": 1, "print": 1, "read": 1, "role": "System Manager", "share": 1, "write": 1},
+  {"read": 1, "role": "HR Manager"}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

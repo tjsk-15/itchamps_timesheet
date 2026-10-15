@@ -31,6 +31,10 @@ DEAD_STATES = ("Rejected", "Cancelled")
 #: Roles allowed to bypass the guardrails for data fixes.
 PRIVILEGED_ROLES = ("System Manager",)
 
+#: Role profiles allowed to cancel and delete a timesheet that is already
+#: Approved or Rejected. They still cannot edit or amend it.
+MANAGER_ROLE_PROFILES = ("Manager",)
+
 # Every rule below can be switched off, and MAX_DAILY_HOURS overridden, from
 # Timesheet Guardrail Settings. These stay as the fallback when that record has
 # never been saved.
@@ -111,6 +115,31 @@ def is_privileged(user=None):
 	if user == "Administrator":
 		return True
 	return bool(set(frappe.get_roles(user)) & set(PRIVILEGED_ROLES))
+
+
+def is_timesheet_manager(user=None):
+	"""True for users holding one of MANAGER_ROLE_PROFILES.
+
+	v15 stores a single profile in User.role_profile_name. v16 moved to the
+	role_profiles table but keeps the old field, so both are checked.
+	"""
+	user = user or frappe.session.user
+	if user == "Guest":
+		return False
+
+	profiles = list(MANAGER_ROLE_PROFILES)
+	if frappe.db.get_value("User", user, "role_profile_name") in profiles:
+		return True
+
+	if not frappe.get_meta("User").has_field("role_profiles"):
+		return False
+
+	return bool(
+		frappe.db.exists(
+			"User Role Profile",
+			{"parenttype": "User", "parent": user, "role_profile": ("in", profiles)},
+		)
+	)
 
 
 def block_amendment(doc):

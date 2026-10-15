@@ -3,6 +3,8 @@
 Run with:  bench --site <site> run-tests --app itchamps_timesheet
 """
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_days, nowdate
@@ -133,3 +135,38 @@ class TestGuardrailSettings(FrappeTestCase):
 		self.settings.bypass_until = add_days(nowdate(), 7)
 		self.settings.bypass_reason = "too long"
 		self.assertRaises(frappe.ValidationError, self.settings.save)
+
+
+PERMISSIONS = "itchamps_timesheet.overrides.timesheet_permissions"
+
+
+class TestLockedTimesheetPermissions(FrappeTestCase):
+	"""Exercises the has_permission hook directly, with the role and role
+	profile lookups patched so no users have to be created."""
+
+	def check(self, ptype, state="Approved", privileged=False, manager=False):
+		from itchamps_timesheet.overrides.timesheet_permissions import has_permission
+
+		doc = frappe._dict(workflow_state=state)
+		with (
+			patch(f"{PERMISSIONS}.is_privileged", return_value=privileged),
+			patch(f"{PERMISSIONS}.is_timesheet_manager", return_value=manager),
+		):
+			return has_permission(doc, ptype, "someone@example.com")
+
+	def test_manager_can_cancel_and_delete_locked_timesheets(self):
+		for state in ("Approved", "Rejected"):
+			for ptype in ("cancel", "delete"):
+				self.assertTrue(self.check(ptype, state, manager=True), (state, ptype))
+
+	def test_manager_still_cannot_edit_or_amend_locked_timesheets(self):
+		for ptype in ("write", "submit", "amend"):
+			self.assertFalse(self.check(ptype, manager=True), ptype)
+
+	def test_other_users_cannot_cancel_or_delete_locked_timesheets(self):
+		for ptype in ("cancel", "delete"):
+			self.assertFalse(self.check(ptype), ptype)
+
+	def test_system_manager_keeps_full_access(self):
+		for ptype in ("write", "cancel", "delete", "amend"):
+			self.assertTrue(self.check(ptype, privileged=True), ptype)

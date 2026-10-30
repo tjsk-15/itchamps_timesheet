@@ -31,8 +31,8 @@ DEAD_STATES = ("Rejected", "Cancelled")
 #: Roles allowed to bypass the guardrails for data fixes.
 PRIVILEGED_ROLES = ("System Manager",)
 
-#: Role profiles allowed to cancel and delete a timesheet that is already
-#: Approved or Rejected. They still cannot edit or amend it.
+#: Role profiles allowed to cancel and delete an Approved or Rejected timesheet
+#: of their direct reports. They still cannot edit or amend it.
 MANAGER_ROLE_PROFILES = ("Manager",)
 
 # Every rule below can be switched off, and MAX_DAILY_HOURS overridden, from
@@ -140,6 +140,23 @@ def is_timesheet_manager(user=None):
 			{"parenttype": "User", "parent": user, "role_profile": ("in", profiles)},
 		)
 	)
+
+
+def is_reporting_manager(employee, user=None):
+	"""True when user is the linked user of the employee's direct manager.
+
+	Deliberately skips the full name fallback in reporting_manager_user. That is
+	good enough for routing, but a shared name must not grant access.
+	"""
+	user = user or frappe.session.user
+	if not employee:
+		return False
+
+	reports_to = frappe.db.get_value("Employee", employee, "reports_to")
+	if not reports_to:
+		return False
+
+	return frappe.db.get_value("Employee", reports_to, "user_id") == user
 
 
 def block_amendment(doc):

@@ -31,10 +31,6 @@ DEAD_STATES = ("Rejected", "Cancelled")
 #: Roles allowed to bypass the guardrails for data fixes.
 PRIVILEGED_ROLES = ("System Manager",)
 
-#: Role profiles allowed to cancel and delete an Approved or Rejected timesheet
-#: of their direct reports. They still cannot edit or amend it.
-MANAGER_ROLE_PROFILES = ("Manager",)
-
 # Every rule below can be switched off, and MAX_DAILY_HOURS overridden, from
 # Timesheet Guardrail Settings. These stay as the fallback when that record has
 # never been saved.
@@ -117,46 +113,11 @@ def is_privileged(user=None):
 	return bool(set(frappe.get_roles(user)) & set(PRIVILEGED_ROLES))
 
 
-def is_timesheet_manager(user=None):
-	"""True for users holding one of MANAGER_ROLE_PROFILES.
-
-	v15 stores a single profile in User.role_profile_name. v16 moved to the
-	role_profiles table but keeps the old field, so both are checked.
-	"""
+def is_timesheet_approver(doc, user=None):
+	"""True when user is the approver this timesheet was routed to by set_approver."""
 	user = user or frappe.session.user
-	if user == "Guest":
-		return False
-
-	profiles = list(MANAGER_ROLE_PROFILES)
-	if frappe.db.get_value("User", user, "role_profile_name") in profiles:
-		return True
-
-	if not frappe.get_meta("User").has_field("role_profiles"):
-		return False
-
-	return bool(
-		frappe.db.exists(
-			"User Role Profile",
-			{"parenttype": "User", "parent": user, "role_profile": ("in", profiles)},
-		)
-	)
-
-
-def is_reporting_manager(employee, user=None):
-	"""True when user is the linked user of the employee's direct manager.
-
-	Deliberately skips the full name fallback in reporting_manager_user. That is
-	good enough for routing, but a shared name must not grant access.
-	"""
-	user = user or frappe.session.user
-	if not employee:
-		return False
-
-	reports_to = frappe.db.get_value("Employee", employee, "reports_to")
-	if not reports_to:
-		return False
-
-	return frappe.db.get_value("Employee", reports_to, "user_id") == user
+	approver = doc.get("custom_project_manager")
+	return bool(approver) and approver == user
 
 
 def block_amendment(doc):

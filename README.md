@@ -7,9 +7,9 @@ scripts with one reviewable, testable app.
 
 1. **Approved and Rejected are terminal.** Once the workflow reaches either
    state the document is frozen, and amendment is blocked outright. Corrections
-   are made by raising a new timesheet. A user with the **Manager** role profile
-   can still cancel and delete these timesheets for employees who report directly
-   to them (`Employee.reports_to`), but cannot edit or amend them.
+   are made by raising a new timesheet. The timesheet's approver
+   (`custom_project_manager`) can still cancel and delete it, but cannot edit or
+   amend it.
 2. **Approvers approve, they do not edit.** An approver can move the workflow
    but cannot change hours, dates, projects or the employee. Any content change
    from a non owner is rejected.
@@ -52,11 +52,10 @@ scripts are kept in `docs/legacy-server-scripts/` for reference.
 The app cannot set these for you. Do them once per site.
 
 1. **Role Permissions Manager, Timesheet.** Uncheck **Amend** for every role
-   except System Manager. Uncheck **Cancel** for Employee and the approver role.
-   Make sure the roles in the **Manager** role profile have **Cancel** and
-   **Delete** ticked. The app only lets that profile past its own lock for
-   direct reports, it cannot grant a permission the role does not have. Each
-   manager's Employee record needs **User ID** filled in, or they will not match.
+   except System Manager. Uncheck **Cancel** for Employee. Make sure the approver
+   role has **Cancel** and **Delete** ticked. The app only lets a timesheet's
+   approver past its own lock, it cannot grant a permission the role does not
+   have, and sharing the timesheet with the approver does not cover either one.
 2. **Customize Form, Timesheet.** Turn off **Allow on Submit** for every field
    except `workflow_state`.
 3. **Projects Settings.** Tick **Ignore Employee Time Overlap** and **Ignore

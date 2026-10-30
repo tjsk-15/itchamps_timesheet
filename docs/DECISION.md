@@ -71,8 +71,9 @@ full layout. The short version:
 Code alone will not close these. Do them in the Desk.
 
 1. **Role Permissions Manager, Timesheet.** Uncheck **Amend** for every role
-   except System Manager. Uncheck **Cancel** for Employee and for the approver
-   role. Corrections happen by raising a new timesheet.
+   except System Manager. Uncheck **Cancel** for Employee. Tick **Cancel** and
+   **Delete** for the approver role, which the app narrows to each timesheet's
+   own approver once it is locked. Corrections happen by raising a new timesheet.
 
 2. **Customize Form, Timesheet.** Set **Allow on Submit** to off for every field
    except `workflow_state`. This is what stops post submission edits at the

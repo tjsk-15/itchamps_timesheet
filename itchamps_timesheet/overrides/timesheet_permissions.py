@@ -8,15 +8,14 @@ disappear in the UI instead of letting the user click through to an error.
 from itchamps_timesheet.overrides.timesheet_rules import (
 	LOCKED_STATES,
 	is_privileged,
-	is_reporting_manager,
-	is_timesheet_manager,
+	is_timesheet_approver,
 )
 
 MUTATING = ("write", "submit", "cancel", "amend", "delete")
 
-#: Actions the Manager role profile may still take on a direct report's locked
-#: timesheet. Cancelling or deleting removes it without changing its contents.
-MANAGER_OVERRIDES = ("cancel", "delete")
+#: Actions the timesheet's approver may still take once it is locked. Cancelling
+#: or deleting removes it without changing its contents.
+APPROVER_OVERRIDES = ("cancel", "delete")
 
 
 def has_permission(doc, ptype=None, user=None):
@@ -30,10 +29,6 @@ def has_permission(doc, ptype=None, user=None):
 	if (doc.get("workflow_state") or "") in LOCKED_STATES:
 		if is_privileged(user):
 			return True
-		return (
-			ptype in MANAGER_OVERRIDES
-			and is_timesheet_manager(user)
-			and is_reporting_manager(doc.get("employee"), user)
-		)
+		return ptype in APPROVER_OVERRIDES and is_timesheet_approver(doc, user)
 
 	return True

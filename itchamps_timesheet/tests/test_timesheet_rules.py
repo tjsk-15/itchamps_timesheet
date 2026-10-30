@@ -141,36 +141,28 @@ PERMISSIONS = "itchamps_timesheet.overrides.timesheet_permissions"
 
 
 class TestLockedTimesheetPermissions(FrappeTestCase):
-	"""Exercises the has_permission hook directly, with the role, role profile
-	and reporting line lookups patched so no users have to be created."""
+	"""Exercises the has_permission hook directly, with the role lookup patched
+	so no users have to be created."""
 
-	def check(self, ptype, state="Approved", privileged=False, manager=False, reports_to_user=False):
+	def check(self, ptype, state="Approved", privileged=False, approver="pm@example.com"):
 		from itchamps_timesheet.overrides.timesheet_permissions import has_permission
 
-		doc = frappe._dict(workflow_state=state, employee="EMP-1")
-		with (
-			patch(f"{PERMISSIONS}.is_privileged", return_value=privileged),
-			patch(f"{PERMISSIONS}.is_timesheet_manager", return_value=manager),
-			patch(f"{PERMISSIONS}.is_reporting_manager", return_value=reports_to_user),
-		):
+		doc = frappe._dict(workflow_state=state, custom_project_manager=approver)
+		with patch(f"{PERMISSIONS}.is_privileged", return_value=privileged):
 			return has_permission(doc, ptype, "someone@example.com")
 
-	def test_manager_can_cancel_and_delete_direct_reports_locked_timesheets(self):
+	def test_approver_can_cancel_and_delete_locked_timesheets(self):
 		for state in ("Approved", "Rejected"):
 			for ptype in ("cancel", "delete"):
-				self.assertTrue(self.check(ptype, state, manager=True, reports_to_user=True), (state, ptype))
+				self.assertTrue(self.check(ptype, state, approver="someone@example.com"), (state, ptype))
 
-	def test_manager_cannot_cancel_or_delete_other_teams_locked_timesheets(self):
-		for ptype in ("cancel", "delete"):
-			self.assertFalse(self.check(ptype, manager=True), ptype)
-
-	def test_reporting_manager_without_profile_cannot_cancel_or_delete(self):
-		for ptype in ("cancel", "delete"):
-			self.assertFalse(self.check(ptype, reports_to_user=True), ptype)
-
-	def test_manager_still_cannot_edit_or_amend_locked_timesheets(self):
+	def test_approver_still_cannot_edit_or_amend_locked_timesheets(self):
 		for ptype in ("write", "submit", "amend"):
-			self.assertFalse(self.check(ptype, manager=True, reports_to_user=True), ptype)
+			self.assertFalse(self.check(ptype, approver="someone@example.com"), ptype)
+
+	def test_timesheet_without_an_approver_stays_locked(self):
+		for ptype in ("cancel", "delete"):
+			self.assertFalse(self.check(ptype, approver=""), ptype)
 
 	def test_other_users_cannot_cancel_or_delete_locked_timesheets(self):
 		for ptype in ("cancel", "delete"):
@@ -179,40 +171,3 @@ class TestLockedTimesheetPermissions(FrappeTestCase):
 	def test_system_manager_keeps_full_access(self):
 		for ptype in ("write", "cancel", "delete", "amend"):
 			self.assertTrue(self.check(ptype, privileged=True), ptype)
-
-
-EMPLOYEES = {
-	"EMP-1": {"reports_to": "EMP-2"},
-	"EMP-2": {"user_id": "boss@example.com"},
-	"EMP-3": {"reports_to": "EMP-4"},
-	"EMP-4": {"user_id": None},
-	"EMP-5": {"reports_to": None},
-}
-
-
-class TestIsReportingManager(FrappeTestCase):
-	"""Runs is_reporting_manager against a patched Employee lookup."""
-
-	def check(self, employee, user):
-		from itchamps_timesheet.overrides.timesheet_rules import is_reporting_manager
-
-		def get_value(doctype, name, field):
-			return EMPLOYEES[name].get(field)
-
-		with patch("frappe.db.get_value", side_effect=get_value):
-			return is_reporting_manager(employee, user)
-
-	def test_direct_manager_matches(self):
-		self.assertTrue(self.check("EMP-1", "boss@example.com"))
-
-	def test_someone_else_does_not_match(self):
-		self.assertFalse(self.check("EMP-1", "other@example.com"))
-
-	def test_manager_without_a_linked_user_matches_nobody(self):
-		self.assertFalse(self.check("EMP-3", "boss@example.com"))
-
-	def test_employee_without_a_manager_matches_nobody(self):
-		self.assertFalse(self.check("EMP-5", "boss@example.com"))
-
-	def test_timesheet_without_an_employee_matches_nobody(self):
-		self.assertFalse(self.check(None, "boss@example.com"))
